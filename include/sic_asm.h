@@ -4,14 +4,9 @@
 #include <iostream>
 #include <map>
 #include <string>
+#include <vector>
 
 using namespace std;
-
-// 24 bit int
-struct int24 
-{
-    unsigned int data : 24;
-};
 
 class Assembler
 {
@@ -20,13 +15,20 @@ private:
     typedef int (Assembler::*FP)();
     map<string, FP> instruction;
 
+    // used during the pass1 to gather all the symbols
     map<string, int> symtable;
 
+    // the location counter for 'START'
     int locctr;
-    int24 instruction_opcode;
+
+    // 24-bit int
+    int instruction_opcode:24;
 
     void pass1();
     void pass2();
+
+    // got to figure out how to correctly format and print
+    void print();
 
     // instruction set
     int add();  int _and();
@@ -45,6 +47,7 @@ private:
 
 public:
     Assembler();
+    void assemble(string);
     
 };
 
