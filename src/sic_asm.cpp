@@ -17,15 +17,40 @@ Assembler::Assembler()
     instruction["TIX"] = &Assembler::tix;     instruction["WD"] = &Assembler::wd;
 }
 
-/******* Pass 1 *******
-*
+void Assembler::assemble(string file)
+{
+    file = "../res/" + file;
 
-*
-*
-***********************/
+    in_file.open(file.c_str(), ios::in);
+    if(!in_file.is_open()){
+        cerr << "Could not open the file!" << endl;
+        exit(1);
+    }
+
+    pass1();
+}
+
+/**************** Pass 1 *********************
+* 1) Assign addresses to all statements in the program
+* 2) Save the values assigned to all labes for use in pass 2
+* 3) Perform some processing of assembler directives    
+*    ex// BYTE, RESW, etc.
+**********************************************/
 void Assembler::pass1()
 {
-    return;
+    string s;
+    for (; in_file.good() ;){
+        getline(in_file, s);
+        if(s.find("start") != std::string::npos){            
+            for(auto &i: s){
+                if(i >= 0x30 or i <= 0x39)
+                    cout << i << endl;
+            }
+        }
+        else
+            locctr = 0;
+        
+    }
 }
 
 void Assembler::pass2()
@@ -33,13 +58,8 @@ void Assembler::pass2()
     return;
 }
 
-void Assembler::assemble(string file)
-{
-    return;
-}
-
 // A <- (A) + (m..m+2)
-int Assembler::add()
+int32 Assembler::add()
 {
     instruction_opcode = 0x18;
     instruction_opcode = instruction_opcode << 16;
@@ -47,7 +67,7 @@ int Assembler::add()
 }
 
 // A <- (A) & (m..m+2)
-int Assembler::_and()
+int32 Assembler::_and()
 {
     instruction_opcode = 0x40;
     instruction_opcode = instruction_opcode << 16;
@@ -55,7 +75,7 @@ int Assembler::_and()
 }
 
 // (A) : (m..m+2)
-int Assembler::comp()
+int32 Assembler::comp()
 {
     instruction_opcode = 0x28;
     instruction_opcode = instruction_opcode << 16;
@@ -63,7 +83,7 @@ int Assembler::comp()
 }
 
 // A <- (A) / (m..m+2)
-int Assembler::_div()
+int32 Assembler::_div()
 {
     instruction_opcode = 0x24;
     instruction_opcode = instruction_opcode << 16;
@@ -71,7 +91,7 @@ int Assembler::_div()
 }
 
 // PC <- m
-int Assembler::j()
+int32 Assembler::j()
 {
     instruction_opcode = 0x3C;
     instruction_opcode = instruction_opcode << 16;
@@ -79,7 +99,7 @@ int Assembler::j()
 }
 
 // PC <- m if CC set to =
-int Assembler::jeq()
+int32 Assembler::jeq()
 {
     instruction_opcode = 0x30;
     instruction_opcode = instruction_opcode << 16;
@@ -87,7 +107,7 @@ int Assembler::jeq()
 }
 
 // PC <- m if CC set to >
-int Assembler::jgt()
+int32 Assembler::jgt()
 {
     instruction_opcode = 0x34;
     instruction_opcode = instruction_opcode << 16;
@@ -95,7 +115,7 @@ int Assembler::jgt()
 }
 
 // PC <- m if CC set to < 
-int Assembler::jlt()
+int32 Assembler::jlt()
 {
     instruction_opcode = 0x38;
     instruction_opcode = instruction_opcode << 16;
@@ -103,7 +123,7 @@ int Assembler::jlt()
 }
 
 // L <- (PC); PC <- m
-int Assembler::jsub()
+int32 Assembler::jsub()
 {
     instruction_opcode = 0x48;
     instruction_opcode = instruction_opcode << 16;
@@ -111,7 +131,7 @@ int Assembler::jsub()
 }
 
 // A <- (m..m+2)
-int Assembler::lda()
+int32 Assembler::lda()
 {
     instruction_opcode = 0x00;
     instruction_opcode = instruction_opcode << 16;
@@ -119,7 +139,7 @@ int Assembler::lda()
 }
 
 // A[rightmost byte] <- (m)
-int Assembler::ldch()
+int32 Assembler::ldch()
 {
     instruction_opcode = 0x50;
     instruction_opcode = instruction_opcode << 16;
@@ -127,7 +147,7 @@ int Assembler::ldch()
 }
 
 // L <- (m..m+2)
-int Assembler::ldl()
+int32 Assembler::ldl()
 {
     instruction_opcode = 0x08;
     instruction_opcode = instruction_opcode << 16;
@@ -135,7 +155,7 @@ int Assembler::ldl()
 }
 
 // X <- (m..m+2)
-int Assembler::ldx()
+int32 Assembler::ldx()
 {
     instruction_opcode = 0x04;
     instruction_opcode = instruction_opcode << 16;
@@ -143,7 +163,7 @@ int Assembler::ldx()
 }
 
 // A <- (A) * (m..m+2)
-int Assembler::mul()
+int32 Assembler::mul()
 {
     instruction_opcode = 0x20;
     instruction_opcode = instruction_opcode << 16;
@@ -151,7 +171,7 @@ int Assembler::mul()
 }
 
 // A <- (A) | (m..m+2)
-int Assembler::_or()
+int32 Assembler::_or()
 {
     instruction_opcode = 0x44;
     instruction_opcode = instruction_opcode << 16;
@@ -159,7 +179,7 @@ int Assembler::_or()
 }
 
 // A[rightmost byte] <- data from device specified by (m)
-int Assembler::rd()
+int32 Assembler::rd()
 {
     instruction_opcode = 0xD8;
     instruction_opcode = instruction_opcode << 16;
@@ -167,7 +187,7 @@ int Assembler::rd()
 }
 
 // PC <- (L)
-int Assembler::rsub()
+int32 Assembler::rsub()
 {
     instruction_opcode = 0x4C;
     instruction_opcode = instruction_opcode << 16;
@@ -175,7 +195,7 @@ int Assembler::rsub()
 }
 
 // m..m+2 <- (A)
-int Assembler::sta()
+int32 Assembler::sta()
 {
     instruction_opcode = 0x0C;
     instruction_opcode = instruction_opcode << 16;
@@ -183,7 +203,7 @@ int Assembler::sta()
 }
 
 // m <- (A)[rightmost byte]
-int Assembler::stch()
+int32 Assembler::stch()
 {
     instruction_opcode = 0x54;
     instruction_opcode = instruction_opcode << 16;
@@ -191,7 +211,7 @@ int Assembler::stch()
 }
 
 // m..m+2 <- (L)
-int Assembler::stl()
+int32 Assembler::stl()
 {
     instruction_opcode = 14;
     instruction_opcode = instruction_opcode << 16;
@@ -199,7 +219,7 @@ int Assembler::stl()
 }
 
 // m..m+2 <- (SW)
-int Assembler::stsw()
+int32 Assembler::stsw()
 {
     instruction_opcode = 0xE8;
     instruction_opcode = instruction_opcode << 16;
@@ -207,7 +227,7 @@ int Assembler::stsw()
 }
 
 // m..m+2 <- (X)
-int Assembler::stx()
+int32 Assembler::stx()
 {
     instruction_opcode = 0x10;
     instruction_opcode = instruction_opcode << 16;
@@ -215,7 +235,7 @@ int Assembler::stx()
 }
 
 // A <- (A) - (m..m+2)
-int Assembler::sub()
+int32 Assembler::sub()
 {
     instruction_opcode = 0x1C;
     instruction_opcode = instruction_opcode << 16;
@@ -223,7 +243,7 @@ int Assembler::sub()
 }
 
 // test device specified by m
-int Assembler::td()
+int32 Assembler::td()
 {
     instruction_opcode = 0xE0;
     instruction_opcode = instruction_opcode << 16;
@@ -231,7 +251,7 @@ int Assembler::td()
 }
 
 // X <- (X) + 1; (X) : (m..m+2)
-int Assembler::tix()
+int32 Assembler::tix()
 {
     instruction_opcode = 0x2C;
     instruction_opcode = instruction_opcode << 16;
@@ -239,7 +259,7 @@ int Assembler::tix()
 }
 
 // device specified by (m) <- (A)[rightmost byte]
-int Assembler::wd()
+int32 Assembler::wd()
 {
     instruction_opcode = 0xDC;
     instruction_opcode = instruction_opcode << 16;
