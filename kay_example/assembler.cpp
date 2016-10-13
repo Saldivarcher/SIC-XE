@@ -20,7 +20,6 @@ Label, opcode, and operand lengths are <= 10.
 #include <iostream>
 #include <iomanip>    // for setw, setfill, hex, ...
 #include <string>
-#include <algorithm>  // for :find
 #include <map>
 #include <cstdlib>    // for exit
 #include <fstream>    // for ifstream
@@ -146,6 +145,8 @@ void write_line(fstream &out, int LOCCTR, string label, string opcode, string op
         << setw(10) << obj_code << endl;
 }
 
+
+// My functions
 void write_header_line(fstream &out, string prog_name, int starting_add, int program_len)
 {
     out << 'H'
@@ -161,25 +162,34 @@ void write_end_record(fstream &out, int starting_add)
         << endl;
 }
 
-int get_obj_code_len(string object_code)
+int get_len(string object_code)
 {
     return object_code.length() / 2;
 }
 
-/*
-    TODO:
-        save the right starting address
-*/
-
-void write_text_record_line(fstream &out, int starting_add, string object_code, string opcode, bool last_line_flag)
+void write_text_record_line(fstream &out, int locctr, int starting_add, string object_code, string opcode, bool last_line_flag)
 {
+    // getting the opcodes then putting it at the end
     static string full_object_code = "";
     full_object_code += object_code;
+    
+    // putting the
+    static int actual_starting_add = 0;
+    
+    // just so it only sets the very first call
+    if(locctr == starting_add)
+        actual_starting_add = starting_add;
+
+    // grabbing the full length of the "full object code"
     static int length = 0;
-    length = get_obj_code_len(full_object_code);
+    length = get_len(full_object_code);
+
+    if(length <= 3)
+        actual_starting_add = locctr;
+
     if(length == 0x1E){
         out << 'T'
-            << setw(6) << setfill('0') << hex << starting_add
+            << setw(6) << setfill('0') << hex << actual_starting_add
             << setw(2) << setfill('0') << hex << length
             << hex << full_object_code
             << endl;
@@ -189,7 +199,7 @@ void write_text_record_line(fstream &out, int starting_add, string object_code, 
     else if(opcode == "RESW" or opcode == "RESB"){
         if(!full_object_code.empty()){
             out << 'T'
-                << setw(6) << setfill('0') << hex << starting_add
+                << setw(6) << setfill('0') << hex << actual_starting_add
                 << setw(2) << setfill('0') << hex << length
                 << hex << full_object_code
                 << endl;
@@ -203,13 +213,14 @@ void write_text_record_line(fstream &out, int starting_add, string object_code, 
             full_object_code.erase(pos, object_code.length());
         length = get_obj_code_len(full_object_code);
         out << 'T'
-            << setw(6) << setfill('0') << hex << starting_add
+            << setw(6) << setfill('0') << hex << actual_starting_add
             << setw(2) << setfill('0') << hex << length
             << hex << full_object_code
             << endl;
         length = 0;
         full_object_code = "";
         full_object_code += object_code;
+        actual_starting_add = locctr ;
     }
     else if(last_line_flag){
         size_t pos = full_object_code.find(object_code);
@@ -217,7 +228,7 @@ void write_text_record_line(fstream &out, int starting_add, string object_code, 
             full_object_code.erase(pos, object_code.length());
         length = get_obj_code_len(full_object_code);
         out << 'T'
-            << setw(6) << setfill('0') << hex << starting_add
+            << setw(6) << setfill('0') << hex << actual_starting_add
             << setw(2) << setfill('0') << hex << length
             << hex << full_object_code
             << endl;
@@ -226,6 +237,7 @@ void write_text_record_line(fstream &out, int starting_add, string object_code, 
     }
 }
 
+// end of my functions
 
 string assemble(string opcode, int operand, bool indexing)
 {
@@ -371,7 +383,7 @@ int main(int argc, char **argv)
     write_header_line(object_file, program_name, starting_addr, prog_length);
 
     // init first Text rec
-    write_text_record_line(object_file, LOCCTR, object_code, opcode, true);
+    write_text_record_line(object_file, LOCCTR, starting_addr, object_code, opcode, false);
     while (!in.eof() and opcode != "END")
     {
         object_code = "";
@@ -408,13 +420,13 @@ int main(int argc, char **argv)
                 object_code = convert_byte_const(operand);
             // if object_code doesn't fit into current Text rec...
             // add object_code to Text rec
-            write_text_record_line(object_file, LOCCTR, object_code, opcode, false);
+            write_text_record_line(object_file, LOCCTR, starting_addr, object_code, opcode, false);
             }
         write_line(listing, LOCCTR, label, opcode, operand, object_code);
         read_line(interm, LOCCTR, label, opcode, operand);
     }
     // write last Text rec to obj prog
-    write_text_record_line(object_file, LOCCTR, object_code, opcode, true);
+    write_text_record_line(object_file, LOCCTR, starting_addr, object_code, opcode, true);
     // write End rec to obj prog
     write_end_record(object_file, starting_addr);
     write_line(listing, LOCCTR, label, opcode, operand);
