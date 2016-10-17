@@ -30,25 +30,33 @@ using namespace std;
 void init_op_table(map<string, string> & op_table)
 {
     // minimum number of opcodes to assemble Fig 2.1
-    op_table["STL"] = "14";
+    op_table["STL"]  = "14";
     op_table["JSUB"] = "48";
-    op_table["LDA"] = "00";
+    op_table["LDA"]  = "00";
     op_table["COMP"] = "28";
-    op_table["JEQ"] = "30";
-    op_table["J"] = "3C";
-    op_table["STA"] = "0C";
+    op_table["JEQ"]  = "30";
+    op_table["J"]    = "3C";
+    op_table["STA"]  = "0C";
     op_table["LDCH"] = "50";
-    op_table["LDL"] = "08";
+    op_table["LDL"]  = "08";
     op_table["RSUB"] = "4C";
-    op_table["LDX"] = "04";
-    op_table["TD"] = "E0";
-    op_table["RD"] = "D8";
+    op_table["LDX"]  = "04";
+    op_table["TD"]   = "E0";
+    op_table["RD"]   = "D8";
     op_table["STCH"] = "54";
-    op_table["TIX"] = "2C";
-    op_table["STA"] = "0C";
-    op_table["STX"] = "10";
-    op_table["JLT"] = "38";
-    op_table["WD"] = "DC";
+    op_table["TIX"]  = "2C";
+    op_table["STA"]  = "0C";
+    op_table["STX"]  = "10";
+    op_table["JLT"]  = "38";
+    op_table["WD"]   = "DC";
+    op_table["ADD"]  = "18";
+    op_table["AND"]  = "40";
+    op_table["DIV"]  = "28";
+    op_table["MUL"]  = "29";
+    op_table["OR"]   = "44";
+    op_table["STSW"] = "E8";
+    op_table["SUB"]  = "1C";
+    op_table["MUL"]  = "20";
 }
 
 // returns length of constants such as C'EOF' = 3, X'05' = 1
@@ -184,6 +192,8 @@ void write_text_record_line(fstream &out, int locctr, int starting_add, string o
     static int length = 0;
     length = get_len(full_object_code);
 
+    // since I set length to 0 after each print
+    // the starting address will always have a length <= 3
     if(length <= 3)
         actual_starting_add = locctr;
 
@@ -211,7 +221,7 @@ void write_text_record_line(fstream &out, int locctr, int starting_add, string o
         size_t pos = full_object_code.find(object_code);
         if(pos != string::npos)
             full_object_code.erase(pos, object_code.length());
-        length = get_obj_code_len(full_object_code);
+        length = get_len(full_object_code);
         out << 'T'
             << setw(6) << setfill('0') << hex << actual_starting_add
             << setw(2) << setfill('0') << hex << length
@@ -220,13 +230,13 @@ void write_text_record_line(fstream &out, int locctr, int starting_add, string o
         length = 0;
         full_object_code = "";
         full_object_code += object_code;
-        actual_starting_add = locctr ;
+        actual_starting_add = locctr;
     }
     else if(last_line_flag){
         size_t pos = full_object_code.find(object_code);
         if(pos != string::npos)
             full_object_code.erase(pos, object_code.length());
-        length = get_obj_code_len(full_object_code);
+        length = get_len(full_object_code);
         out << 'T'
             << setw(6) << setfill('0') << hex << actual_starting_add
             << setw(2) << setfill('0') << hex << length

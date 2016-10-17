@@ -1,5 +1,5 @@
 CC = c++
-CFLAGS = -std=c++11
+CFLAGS = -std=c++11 
 
 assembler:
 	$(CC) $(CFLAGS) assembler.cpp -o assembler
