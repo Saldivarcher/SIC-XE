@@ -29,34 +29,36 @@ using namespace std;
 
 void init_op_table(map<string, string> & op_table)
 {
-    // minimum number of opcodes to assemble Fig 2.1
-    op_table["STL"]  = "14";
-    op_table["JSUB"] = "48";
-    op_table["LDA"]  = "00";
-    op_table["COMP"] = "28";
-    op_table["JEQ"]  = "30";
-    op_table["J"]    = "3C";
-    op_table["STA"]  = "0C";
-    op_table["LDCH"] = "50";
-    op_table["LDL"]  = "08";
-    op_table["RSUB"] = "4C";
-    op_table["LDX"]  = "04";
-    op_table["TD"]   = "E0";
-    op_table["RD"]   = "D8";
-    op_table["STCH"] = "54";
-    op_table["TIX"]  = "2C";
-    op_table["STA"]  = "0C";
-    op_table["STX"]  = "10";
-    op_table["JLT"]  = "38";
-    op_table["WD"]   = "DC";
-    op_table["ADD"]  = "18";
-    op_table["AND"]  = "40";
-    op_table["DIV"]  = "28";
-    op_table["MUL"]  = "29";
-    op_table["OR"]   = "44";
-    op_table["STSW"] = "E8";
-    op_table["SUB"]  = "1C";
-    op_table["MUL"]  = "20";
+    // Original SIC machine
+    op_table["STL"]    = "14";
+    op_table["JSUB"]   = "48";
+    op_table["LDA"]    = "00";
+    op_table["COMP"]   = "28";
+    op_table["JEQ"]    = "30";
+    op_table["J"]      = "3C";
+    op_table["STA"]    = "0C";
+    op_table["LDCH"]   = "50";
+    op_table["LDL"]    = "08";
+    op_table["RSUB"]   = "4C";
+    op_table["LDX"]    = "04";
+    op_table["TD"]     = "E0";
+    op_table["RD"]     = "D8";
+    op_table["STCH"]   = "54";
+    op_table["TIX"]    = "2C";
+    op_table["STA"]    = "0C";
+    op_table["STX"]    = "10";
+    op_table["JLT"]    = "38";
+    op_table["WD"]     = "DC";
+    op_table["ADD"]    = "18";
+    op_table["AND"]    = "40";
+    op_table["DIV"]    = "28";
+    op_table["MUL"]    = "29";
+    op_table["OR"]     = "44";
+    op_table["STSW"]   = "E8";
+    op_table["SUB"]    = "1C";
+    op_table["MUL"]    = "20";
+
+
 }
 
 // returns length of constants such as C'EOF' = 3, X'05' = 1
@@ -175,6 +177,15 @@ int get_len(string object_code)
     return object_code.length() / 2;
 }
 
+void print(fstream &out, int actual_starting_add, int length, string full_object_code)
+{
+    out << 'T'
+        << setw(6) << setfill('0') << hex << actual_starting_add
+        << setw(2) << setfill('0') << hex << length
+        << hex << full_object_code
+        << endl;
+}
+
 void write_text_record_line(fstream &out, int locctr, int starting_add, string object_code, string opcode, bool last_line_flag)
 {
     // getting the opcodes then putting it at the end
@@ -198,21 +209,13 @@ void write_text_record_line(fstream &out, int locctr, int starting_add, string o
         actual_starting_add = locctr;
 
     if(length == 0x1E){
-        out << 'T'
-            << setw(6) << setfill('0') << hex << actual_starting_add
-            << setw(2) << setfill('0') << hex << length
-            << hex << full_object_code
-            << endl;
+        print(out, actual_starting_add, length, full_object_code);
         length = 0;
         full_object_code = "";
     }
     else if(opcode == "RESW" or opcode == "RESB"){
         if(!full_object_code.empty()){
-            out << 'T'
-                << setw(6) << setfill('0') << hex << actual_starting_add
-                << setw(2) << setfill('0') << hex << length
-                << hex << full_object_code
-                << endl;
+            print(out, actual_starting_add, length, full_object_code);
             length = 0;
             full_object_code = "";
         }
@@ -222,11 +225,7 @@ void write_text_record_line(fstream &out, int locctr, int starting_add, string o
         if(pos != string::npos)
             full_object_code.erase(pos, object_code.length());
         length = get_len(full_object_code);
-        out << 'T'
-            << setw(6) << setfill('0') << hex << actual_starting_add
-            << setw(2) << setfill('0') << hex << length
-            << hex << full_object_code
-            << endl;
+        print(out, actual_starting_add, length, full_object_code);
         length = 0;
         full_object_code = "";
         full_object_code += object_code;
@@ -237,11 +236,7 @@ void write_text_record_line(fstream &out, int locctr, int starting_add, string o
         if(pos != string::npos)
             full_object_code.erase(pos, object_code.length());
         length = get_len(full_object_code);
-        out << 'T'
-            << setw(6) << setfill('0') << hex << actual_starting_add
-            << setw(2) << setfill('0') << hex << length
-            << hex << full_object_code
-            << endl;
+        print(out, actual_starting_add, length, full_object_code);
         length = 0;
         full_object_code = "";
     }
@@ -394,8 +389,9 @@ int main(int argc, char **argv)
 
     // init first Text rec
     write_text_record_line(object_file, LOCCTR, starting_addr, object_code, opcode, false);
-    while (!in.eof() and opcode != "END")
+    while (!interm.eof() and opcode != "END")
     {
+        cout << operand << endl;
         object_code = "";
         if (label == "" or label[0] != '.') // not comment
         {
