@@ -9,6 +9,7 @@
 #include <fstream>    // for ifstream
 #include <sstream>    // for stringstream
 #include <ctype.h>    // for isdigit
+#include <bitset>
 
 using namespace std;
 
@@ -23,9 +24,8 @@ private:
     string base_operand;
     string label, opcode, operand, program_name, object_code;
     char *file;
-    bool indirect, indexing, immediate, base, pc, extended;
-    bool rel = true;
-    bool format4;
+    bool indirect, immediate, indexing, base_rel, pc_rel, extended;
+    bool format2;
 
     void init_op_table(map<string, string> &);
     int const_len(string);
@@ -49,13 +49,14 @@ private:
 
     map<string, int> init_registers();
 
-    string assemble(string, int, bool);
-    string assemble(string opcode, int operand, bool n, bool i, bool x, bool b, bool p, bool e);
+    string assemble(string, int);
+    int get_addressing();
     void pass1();
     void pass2();
 
 public:
     void run(char*);
+    Assembler();
 };
 
 #endif

@@ -1,5 +1,16 @@
 #include "assembler.h"
 
+Assembler::Assembler()
+{
+    format2 = false;
+
+    indirect = false;
+    immediate = false;
+    indexing = false;
+    base_rel = false;
+    pc_rel = false;
+    extended = false;
+}
 
 void Assembler::init_op_table(map<string, string> & op_table)
 {
@@ -254,27 +265,39 @@ void Assembler::write_text_record_line(fstream &out, int locctr, int starting_ad
     }
 }
 
-
-string Assembler::assemble(string opcode, int operand, bool n, bool i, bool x, bool b, bool p, bool e)
+int Assembler::get_addressing()
 {
-    string obj_code = opcode;
-    if (indexing)
-        operand |= 0x8000; // turn on bit 15
-    stringstream ss;
-    ss << setw(4) << setfill('0') << hex << operand;
-    obj_code += ss.str();
-    return obj_code;
+    unsigned long temp;
+    if (!immediate and !indirect)
+        immediate = indirect = true;
+
+    bitset<18> b;
+
+    b[17] = indirect;
+    b[16] = immediate;
+    b[15] = indexing;
+    b[14] = base_rel;
+    b[13] = pc_rel;
+    b[12] = extended;
+    temp = b.to_ulong();
+    int n = (int)temp;
+
+    return n;
 }
 
-string Assembler::assemble(string opcode, int operand, bool indexing)
+string Assembler::assemble(string op, int operand)
 {
-    string obj_code = opcode;
-    if (indexing)
-        operand |= 0x8000; // turn on bit 15
+    int i = get_addressing();
+    string obj_code = op;
     stringstream ss;
     ss << setw(4) << setfill('0') << hex << operand;
     obj_code += ss.str();
-    return obj_code;
+    cout << "opcode: " << opcode << " obj_code: " << obj_code << endl;
+    long long n = stoll(obj_code);
+
+    //n |= i;
+    //obj_code = to_string(n);
+    return "1";
 }
 
 
@@ -331,23 +354,29 @@ map<string, int> Assembler::init_registers()
 
 void Assembler::relative_address(int &operand_addr, int pc, int base, string opcode)
 {
-    int pc_rel   = operand_addr - pc;
-    int base_rel = operand_addr - base;
+    int pc_   = operand_addr - pc;
+    int base_ = operand_addr - base;
 
-    if (pc_rel >= -2048 and pc_rel <= 2047){
-        operand_addr = pc_rel;
-        cout << "pc operand_addr: " << operand_addr << " opcode: " << opcode << endl;
+    if (format2 or extended)
         return;
-    }
-    else if(base_rel >= 0 and base_rel <= 4095){
-        operand = base_rel;
-        cout << "base operand_addr: " << operand_addr << " opcode: " << opcode << endl;
+    if (opcode == "RSUB")
         return;
+
+    if ((pc_ >= -2048 and pc_ <= 2047) and !indexing)
+    {
+        operand_addr = pc_;
+        pc_rel = true;
     }
-    else{
-        cout << operand_addr << " " << pc << " " << base << endl;
+    else if((base_ >= 0 and base_ <= 4095) or indexing) 
+    {
+        operand_addr = base_;
+        base_rel = true;
+    }
+    else
+    {
+        cout << hex << LOCCTR << " " << opcode << endl;
         cout << "You have to use format 4!" << endl;
-        exit(9);
+        return;
     }
 }
 
@@ -389,24 +418,18 @@ void Assembler::pass1()
                     exit(4);
                 }
             }
-            if (OPTAB.find(opcode) != OPTAB.end())
+            if (opcode == "CLEAR" or opcode == "COMPR" or opcode == "TIXR")
+                LOCCTR += 2;
+            else if (OPTAB.find(opcode) != OPTAB.end())
                 LOCCTR += 3;
-            else if (opcode == "WORD"){
+            else if (opcode == "WORD")
                 LOCCTR += 3;
-                rel = false;
-            }
-            else if (opcode == "RESW"){
+            else if (opcode == "RESW")
                 LOCCTR += (3 * stoi(operand));
-                rel = false;
-            }
-            else if (opcode == "RESB"){
+            else if (opcode == "RESB")
                 LOCCTR += stoi(operand);
-                rel = false;
-            }
-            else if (opcode == "BYTE"){
+            else if (opcode == "BYTE")
                 LOCCTR += const_len(operand);
-                rel = false;
-            }
             else if(opcode == "BASE"){
                 BASE = 0;
                 base_operand = operand;
@@ -429,7 +452,6 @@ void Assembler::pass1()
     prog_len = LOCCTR - starting_addr;
 
     BASE = SYMTAB[base_operand];
-    cout << "BASE: " << hex << BASE << endl;
     map<string, int> registers = init_registers();
     SYMTAB.insert(registers.begin(), registers.end());
 
@@ -439,6 +461,7 @@ void Assembler::pass1()
 
 void Assembler::pass2()
 {
+    string temp = "";
     open_files_pass2();
     read_line(interm, LOCCTR, label, opcode, operand);
     if(opcode == "START")
@@ -454,17 +477,28 @@ void Assembler::pass2()
     write_text_record_line(object_file, LOCCTR, starting_addr, object_code, opcode, false);
     while (!interm.eof() and opcode != "END")
     {
+        indirect = immediate = indexing = base_rel = pc_rel = extended = false;
+        format2 = false;
         object_code = "";
         if (label == "" or label[0] != '.') // not comment
         {
+
+            if (opcode[0] == '+')
+            {
+                extended = true;
+                temp = opcode;
+                opcode = opcode.substr(1);
+            }
+
             if (OPTAB[opcode] != "")
             {
                 if (operand != "")
                 {
+                    if (opcode == "CLEAR" or opcode == "TIXR")
+                        format2 = true;
                     // if ,X at end of operand, remove and pass index flag to assemble()
-                    
-                    // x is getting read as well?
-                    if (operand.find(",X") != string::npos )
+                    // using find because "substr" would work on "CLEAR X"
+                    else if (operand.find(",X") != string::npos )
                     {
                         operand = operand.substr(0, operand.length() - 2);
                         indexing = true;
@@ -481,17 +515,19 @@ void Assembler::pass2()
                     else if(operand[0] == '#')
                     {
                         immediate = true;
+                        if(opcode == "COMP")
+                            format2 = true;
                         if (isdigit(operand[1]))
                             operand_addr = stoi(operand.substr(1, operand.length()));
                     }
                     else if (operand[0] == '@')
                         indirect = true;
-
                     else if (opcode == "COMPR")
                     {
                         operand_addr = 0;
                         operand_addr = operand_addr << SYMTAB[operand.substr(0, 1)];
                         operand_addr += SYMTAB[operand.substr(operand.length()-1)];
+                        format2 = true;
                     }
                     else
                     {
@@ -504,8 +540,7 @@ void Assembler::pass2()
 
                 int pc = LOCCTR + 3;
                 relative_address(operand_addr, pc, BASE, opcode);
-
-                object_code = assemble(OPTAB[opcode], operand_addr, indexing);
+                object_code = assemble(OPTAB[opcode], operand_addr);
             }
             else if (opcode == "WORD")
                 object_code = convert_word_const(operand);
@@ -514,7 +549,9 @@ void Assembler::pass2()
             // if object_code doesn't fit into current Text rec...
             // add object_code to Text rec
             write_text_record_line(object_file, LOCCTR, starting_addr, object_code, opcode, false);
-            }
+        }
+        if(extended)
+            opcode = temp;
         write_line(listing, LOCCTR, label, opcode, operand, object_code);
         read_line(interm, LOCCTR, label, opcode, operand);
     }
