@@ -284,6 +284,11 @@ void Assembler::write_mod_line(fstream &out)
     system(rm);
 }
 
+/*
+* Helper function that grabs the boolean values of the 
+* register, and puts it into array of bools or 'bitset'.
+* Then I turn the bitset into the corresponding integer
+*/
 int Assembler::get_addressing()
 {
     unsigned long temp;
@@ -308,6 +313,7 @@ int Assembler::get_addressing()
     }
     else
     {
+        // extended, so 6 flag bits + 20 address bits
         bitset<26> b;
         b[25] = indirect;
         b[24] = immediate;
@@ -340,12 +346,15 @@ string Assembler::assemble(string op, int operand)
     }
     else if(extended)
     {
+        // i will be the value gathered from [n|i|x|b|p|e|   disp    ]
         int i = get_addressing();
         stringstream tt;
         ss << setw(6) << setfill('0') << hex << operand;
         string test = "";
         obj_code += ss.str();
-        long n = stol(obj_code, nullptr, 16);
+
+        // I'm telling the stoi fun that I am using base 16
+        int n = stoi(obj_code, nullptr, 16);
         n |= i;
         tt << hex << n;
         obj_code = "";
@@ -360,11 +369,15 @@ string Assembler::assemble(string op, int operand)
         string test = "";
         obj_code += ss.str();
         int size = obj_code.size();
-        long n = stol(obj_code, nullptr, 16);
+
+        // I'm telling the stoi fun that I am using base 16
+        int n = stoi(obj_code, nullptr, 16);
         n |= i;
         tt << hex << n;
         obj_code = "";
         obj_code = tt.str();
+
+        // obj_code gets truncated when opcode[0] == '0'
         if(obj_code.size() != size)
             obj_code.insert(0, 1, '0');
         return obj_code;
@@ -412,6 +425,8 @@ void Assembler::open_files_pass2()
     m_file.open((string(file) + ".m"), ios::out);
 }
 
+
+// setting register to corresponding values
 map<string, int> Assembler::init_registers()
 {
     map<string, int> r;
@@ -424,18 +439,30 @@ map<string, int> Assembler::init_registers()
     return r;
 }
 
+
+/*
+* This functon calculates the relative address of an instruction
+* based on whether it is pc_rel or base_rel. If not give user an error
+* telling them to use format4/extended
+*/
 void Assembler::relative_address(int &operand_addr, int pc, int base, string opcode)
 {
     int pc_   = operand_addr - pc;
     int base_ = operand_addr - base;
 
+    // format2, extended, and immediate instr
+    // don't need relative addresses
     if (format2 or extended or immediate)
         return;
     if (opcode == "RSUB")
         return;
 
+    // indexing is always base_rel
     if ((pc_ >= -2048 and pc_ <= 2047) and !indexing)
     {
+        // negative value was a bigger than 12 bits
+        // so I inverted than got the negative value
+        // into 12 bits
         if (pc_ < 0)
         {
             pc_ = ~pc_;
@@ -453,7 +480,7 @@ void Assembler::relative_address(int &operand_addr, int pc, int base, string opc
     {
         cout << opcode << " " << operand << endl;
         cout << "You have to use format 4!" << endl;
-        return;
+        exit(10);
     }
 }
 
@@ -528,7 +555,11 @@ void Assembler::pass1()
     write_line(interm, LOCCTR, label, opcode, operand);
     prog_len = LOCCTR - starting_addr;
 
+    // setting base to its operands location
     BASE = SYMTAB[base_operand];
+
+    // inserting registers and thier values into symtab
+    // A = 0, X = 1, ..., PC = 8, SW = 9
     map<string, int> registers = init_registers();
     SYMTAB.insert(registers.begin(), registers.end());
 
@@ -559,7 +590,8 @@ void Assembler::pass2()
         object_code = "";
         if (label == "" or label[0] != '.') // not comment
         {
-
+            // remove the '+' from the opcode
+            // and set e bit = 1
             if (opcode[0] == '+')
             {
                 extended = true;
@@ -583,6 +615,8 @@ void Assembler::pass2()
                     else
                         indexing = false;
 
+                    // only going to get operands that don't
+                    // have 'special' characters infront 
                     if (SYMTAB.find(operand) != SYMTAB.end())
                     {
                         operand_addr = SYMTAB[operand];
@@ -628,6 +662,10 @@ void Assembler::pass2()
             write_text_record_line(object_file, LOCCTR, starting_addr, object_code, opcode, false);
 
             
+            // only making modifications on instructions that
+            // jump to a subroutine, and assuming user knows
+            // that they must make it extended when doing that
+            // jump instruction
             if(extended and SYMTAB.find(operand) != SYMTAB.end())
                 make_mod_line(m_file);
         }
