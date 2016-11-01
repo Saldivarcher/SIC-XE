@@ -4,6 +4,7 @@
 #include <iostream>
 #include <iomanip>    // for setw, setfill, hex, ...
 #include <string>
+#include <cstdio>
 #include <map>
 #include <cstdlib>    // for exit
 #include <fstream>    // for ifstream
@@ -18,7 +19,7 @@ class Assembler
 private:
     map<string, string> OPTAB;
     map<string, int> SYMTAB;
-    fstream in, interm, listing, object_file;
+    fstream in, interm, listing, object_file, m_file;
     int LOCCTR, PREV_LOCCTR, starting_addr, prog_len, operand_addr;
     int BASE;
     string base_operand;
@@ -41,6 +42,8 @@ private:
     int get_len(string);
     void print(fstream &, int, int, string);
     void write_text_record_line(fstream &, int, int, string, string, bool);
+    void write_mod_line(fstream &);
+    void make_mod_line(fstream &);
 
     void relative_address(int&, int, int, string);
 
@@ -50,6 +53,7 @@ private:
     map<string, int> init_registers();
 
     string assemble(string, int);
+
     int get_addressing();
     void pass1();
     void pass2();

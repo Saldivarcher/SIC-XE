@@ -265,41 +265,111 @@ void Assembler::write_text_record_line(fstream &out, int locctr, int starting_ad
     }
 }
 
+void Assembler::make_mod_line(fstream &out)
+{
+    out << 'M'
+        << setw(6) << setfill('0') << hex << LOCCTR + 1
+        << setw(2) << setfill('0') << '5' << endl;
+}
+
+void Assembler::write_mod_line(fstream &out)
+{
+    string s;
+    ifstream m(string(file) + ".m");
+    while (getline(m, s))
+        out << s << endl;
+
+    string rem = "rm " + string(file) + ".m";
+    const char *rm = rem.c_str();
+    system(rm);
+}
+
 int Assembler::get_addressing()
 {
     unsigned long temp;
     if (!immediate and !indirect)
         immediate = indirect = true;
 
-    bitset<18> b;
+    if(!extended)
+    {
+        if(opcode == "LDB")
+            pc_rel = 1;
+        bitset<18> b;
+        b[17] = indirect;
+        b[16] = immediate;
+        b[15] = indexing;
+        b[14] = base_rel;
+        b[13] = pc_rel;
+        b[12] = extended;
+        temp = b.to_ulong();
+        int n = (int)temp;
 
-    b[17] = indirect;
-    b[16] = immediate;
-    b[15] = indexing;
-    b[14] = base_rel;
-    b[13] = pc_rel;
-    b[12] = extended;
-    temp = b.to_ulong();
-    int n = (int)temp;
+        return n;
+    }
+    else
+    {
+        bitset<26> b;
+        b[25] = indirect;
+        b[24] = immediate;
+        b[23] = indexing;
+        b[22] = base_rel;
+        b[21] = pc_rel;
+        b[20] = extended;
+        temp = b.to_ulong();
+        int n = (int)temp;
 
-    return n;
+        return n;
+    }
 }
 
 string Assembler::assemble(string op, int operand)
 {
-    int i = get_addressing();
     string obj_code = op;
     stringstream ss;
-    ss << setw(4) << setfill('0') << hex << operand;
-    obj_code += ss.str();
-    cout << "opcode: " << opcode << " obj_code: " << obj_code << endl;
-    long long n = stoll(obj_code);
-
-    //n |= i;
-    //obj_code = to_string(n);
-    return "1";
+    if (format2)
+    {
+        if(opcode != "COMPR"){
+            ss << setw(2) << setfill('0') << left << hex << operand;
+            obj_code += ss.str();
+            return obj_code;
+        } else {
+            ss << setw(2) << setfill('0') << right << hex << operand;
+            obj_code += ss.str();
+            return obj_code;
+        }
+    }
+    else if(extended)
+    {
+        int i = get_addressing();
+        stringstream tt;
+        ss << setw(6) << setfill('0') << hex << operand;
+        string test = "";
+        obj_code += ss.str();
+        long n = stol(obj_code, nullptr, 16);
+        n |= i;
+        tt << hex << n;
+        obj_code = "";
+        obj_code = tt.str();
+        return obj_code;
+    }
+    else
+    {
+        int i = get_addressing();
+        stringstream tt;
+        ss << setw(4) << setfill('0') << hex << operand;
+        string test = "";
+        obj_code += ss.str();
+        int size = obj_code.size();
+        long n = stol(obj_code, nullptr, 16);
+        n |= i;
+        tt << hex << n;
+        obj_code = "";
+        obj_code = tt.str();
+        if(obj_code.size() != size)
+            obj_code.insert(0, 1, '0');
+        return obj_code;
+    }
 }
-
 
 void Assembler::open_files_pass1()
 {
@@ -338,6 +408,8 @@ void Assembler::open_files_pass2()
         cout << "Couldn't open " << string(file) << ".o for output\n";
         exit(8);
     }
+
+    m_file.open((string(file) + ".m"), ios::out);
 }
 
 map<string, int> Assembler::init_registers()
@@ -357,13 +429,18 @@ void Assembler::relative_address(int &operand_addr, int pc, int base, string opc
     int pc_   = operand_addr - pc;
     int base_ = operand_addr - base;
 
-    if (format2 or extended)
+    if (format2 or extended or immediate)
         return;
     if (opcode == "RSUB")
         return;
 
     if ((pc_ >= -2048 and pc_ <= 2047) and !indexing)
     {
+        if (pc_ < 0)
+        {
+            pc_ = ~pc_;
+            pc_ = 0xFFF - pc_;
+        }
         operand_addr = pc_;
         pc_rel = true;
     }
@@ -374,7 +451,7 @@ void Assembler::relative_address(int &operand_addr, int pc, int base, string opc
     }
     else
     {
-        cout << hex << LOCCTR << " " << opcode << endl;
+        cout << opcode << " " << operand << endl;
         cout << "You have to use format 4!" << endl;
         return;
     }
@@ -515,13 +592,13 @@ void Assembler::pass2()
                     else if(operand[0] == '#')
                     {
                         immediate = true;
-                        if(opcode == "COMP")
-                            format2 = true;
                         if (isdigit(operand[1]))
                             operand_addr = stoi(operand.substr(1, operand.length()));
                     }
-                    else if (operand[0] == '@')
+                    else if (operand[0] == '@'){
                         indirect = true;
+                        operand_addr = SYMTAB[operand.substr(1)];
+                    }
                     else if (opcode == "COMPR")
                     {
                         operand_addr = 0;
@@ -549,6 +626,10 @@ void Assembler::pass2()
             // if object_code doesn't fit into current Text rec...
             // add object_code to Text rec
             write_text_record_line(object_file, LOCCTR, starting_addr, object_code, opcode, false);
+
+            
+            if(extended and SYMTAB.find(operand) != SYMTAB.end())
+                make_mod_line(m_file);
         }
         if(extended)
             opcode = temp;
@@ -557,11 +638,14 @@ void Assembler::pass2()
     }
     // write last Text rec to obj prog
     write_text_record_line(object_file, LOCCTR, starting_addr, object_code, opcode, true);
+    write_mod_line(object_file);
+
     // write End rec to obj prog
     write_end_record(object_file, starting_addr);
     write_line(listing, LOCCTR, label, opcode, operand);
     interm.close();
     listing.close();
+    m_file.close();
 }
 
 void Assembler::run(char* f)
