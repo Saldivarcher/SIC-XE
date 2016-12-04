@@ -4,7 +4,6 @@
 #include <sstream>
 #include <map>
 #include <list>
-#include <iomanip>
 #include <algorithm>
 
 using namespace std;
@@ -144,6 +143,103 @@ char get_hex(string s)
     return c;
 }
 
+void update_mem(char mem[], string t, int actual_location)
+{
+    string temp;
+    for(auto i: t)
+    {
+        temp += i;
+        if(temp.size() == 2)
+        {
+            char c = get_hex(temp);
+            mem[actual_location++] = c;
+            temp.clear();
+        }
+    }
+}
+
+void modified_obj_code(int &modified, string sign, string t, string symbol, map<string, estab_data> ESTAB)
+{
+    if (sign[0] == '+')
+    {
+        int inverse = stoi(t, nullptr, 16);
+        if (t[0] == 'f')
+        {
+            inverse = (0xffffff - inverse);
+            inverse = ~inverse;
+        }
+        modified = inverse + ESTAB[symbol].address;
+    }
+    else
+    {
+        int inverse = stoi(t, nullptr, 16);
+        if(t[0] == 'f')
+        {
+            inverse = (0xffffff - inverse);
+            inverse = ~inverse;
+        }
+        modified = inverse - ESTAB[symbol].address;
+    }
+}
+
+
+void update_estab(map<string, estab_data> &ESTAB, list<string> drec_holder, string cs, int CSADDR)
+{
+    string temp;
+    for(auto i: drec_holder)
+    {
+        if(ESTAB.find(i) != ESTAB.end())
+        {
+            cout << "Duplicate symbol in DREC! " << i << endl;
+            exit(2);
+        }
+        else
+        {
+            if (isalpha(i[0]))
+            {
+                ESTAB[i].control_section = cs;
+                temp = i;
+            }
+            else if(isdigit(i[0]))
+                ESTAB[temp].address = CSADDR + stoi(i, nullptr, 16);
+        }
+    }
+}
+
+void print_estab(map<string, estab_data> ESTAB)
+{
+    cout << "Symbol"
+         << "\t\tCS "
+         << "\t\tAddress "
+         << "\tLength " << endl;
+    for (auto i : ESTAB)
+    {
+        cout << i.first << "\t\t" << i.second.control_section
+             << hex << "\t\t" << i.second.address
+             << "\t\t" << i.second.length << endl;
+    }
+}
+
+void memory_object(string &t, int actual_location, char mem[])
+{
+    for (int i = actual_location; i < actual_location + 3; i++)
+    {
+        stringstream ss;
+        int value = mem[i];
+        if(value < 0)
+            value = value - 0xffffff00;
+        
+        ss << hex << value;
+        string s(ss.str());
+        if(s.size() == 1)
+        {
+            s.insert(0, 1, '0');
+        }
+        t += s;
+    }
+}
+
+
 int main(int argv, char **argc)
 {
     map<string, estab_data> ESTAB;
@@ -179,25 +275,7 @@ int main(int argv, char **argc)
             if (record[0] == 'D')
             {
                 parse_record(record, drec_holder);
-                string temp;
-                for(auto i: drec_holder)
-                {
-                    if(ESTAB.find(i) != ESTAB.end())
-                    {
-                        cout << "Duplicate symbol in DREC! " << i << endl;
-                        exit(2);
-                    }
-                    else
-                    {
-                        if (isalpha(i[0]))
-                        {
-                            ESTAB[i].control_section = cs;
-                            temp = i;
-                        }
-                        else if(isdigit(i[0]))
-                            ESTAB[temp].address = CSADDR + stoi(i, nullptr, 16);
-                    }
-                }
+                update_estab(ESTAB, drec_holder, cs, CSADDR);
             }
         }
         // clearing the list that holds D records
@@ -207,16 +285,8 @@ int main(int argv, char **argc)
     }
 
     infile.close();
-    cout << "Symbol"
-         << "\t\tCS "
-         << "\t\tAddress "
-         << "\tLength " << endl;
-    for (auto i : ESTAB)
-    {
-        cout << i.first << "\t\t" << i.second.control_section
-             << hex << "\t\t" << i.second.address
-             << "\t\t" << i.second.length << endl;
-    }
+
+    print_estab(ESTAB);
     
     // Pass 2
     CSADDR = PROGADDR;
@@ -271,95 +341,26 @@ int main(int argv, char **argc)
                     if(int_length == 5)
                     {
                         string t;
-                        for (int i = actual_location; i < actual_location + 3; i++)
-                        {
-                            stringstream ss;
-                            ss << hex << (int)mem[i];
-                            string s(ss.str());
-                            if(s.size() == 1)
-                            {
-                                s.insert(0, 1, '0');
-                            }
-                            t += s;
-                        }
-
-                        if(t.size() > 6)
-                            t = t.substr(0, 6);
-
+                        memory_object(t, actual_location, mem);
                         int modified;
-                        if (sign[0] == '+')
-                            modified = stoi(t, nullptr, 16) + ESTAB[symbol].address;
-                        else
-                            modified = stoi(t, nullptr, 16) - ESTAB[symbol].address;
-                        stringstream ss;
-                        ss << hex << modified;
-                        t = ss.str();
-                        string temp;
-                        for(auto i: t)
-                        {
-                            temp += i;
-                            if(temp.size() == 2)
-                            {
-                                char c = get_hex(temp);
-                                mem[actual_location++] = c;
-                                temp.clear();
-                            }
-                        }
-                    }
-                    else
-                    {
-                        string t;
-                        for (int i = actual_location; i < actual_location + 3; i++)
-                        {
-                            stringstream ss;
-                            int value = mem[i];
-                            if(value < 0)
-                                value = value - 0xffffff00;
-                            
-                            ss << hex << value;
-                            string s(ss.str());
-                            if(s.size() == 1)
-                            {
-                                s.insert(0, 1, '0');
-                            }
-                            t += s;
-                        }
-                        int modified;
-                        if (sign[0] == '+')
-                        {
-                            int inverse = stoi(t, nullptr, 16);
-                            if (t[0] == 'f')
-                            {
-                                inverse = (0xffffff - inverse);
-                                inverse = ~inverse;
-                            }
-                            modified = inverse + ESTAB[symbol].address;
-                        }
-                        else
-                        {
-                            int inverse = stoi(t, nullptr, 16);
-                            if(t[0] == 'f')
-                            {
-                                inverse = (0xffffff - inverse);
-                                inverse = ~inverse;
-                            }
-                            modified = inverse - ESTAB[symbol].address;
-                        }
+                        modified_obj_code(modified, sign, t, symbol, ESTAB);
                         stringstream ss;
                         ss << hex << modified;
                         t = ss.str();
                         t = insert_zero(t);
-                        string temp;
-                        for (auto i : t)
-                        {
-                            temp += i;
-                            if(temp.size() == 2)
-                            {
-                                char c = get_hex(temp);
-                                mem[actual_location++] = c;
-                                temp.clear();
-                            }                            
-                        }
+                        update_mem(mem, t, actual_location);
+                    }
+                    else
+                    {
+                        string t;
+                        memory_object(t, actual_location, mem);
+                        int modified;
+                        modified_obj_code(modified, sign, t, symbol, ESTAB);
+                        stringstream ss;
+                        ss << hex << modified;
+                        t = ss.str();
+                        t = insert_zero(t);
+                        update_mem(mem, t, actual_location);
                     }
                 }
                 else
