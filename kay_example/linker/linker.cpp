@@ -205,17 +205,17 @@ int main(int argv, char **argc)
             CSADDR += CSLTH;
         drec_holder.clear();
     }
-    
+
     infile.close();
     cout << "Symbol"
-         << setw(7) << "CS "
-         << setw(12) << "Address "
-         << setw(5) << "Length " << endl;
+         << "\t\tCS "
+         << "\t\tAddress "
+         << "\tLength " << endl;
     for (auto i : ESTAB)
     {
-        cout << i.first << setw(10) << i.second.control_section
-             << hex << setw(5) << i.second.address
-             << setw(5) << i.second.length << endl;
+        cout << i.first << "\t\t" << i.second.control_section
+             << hex << "\t\t" << i.second.address
+             << "\t\t" << i.second.length << endl;
     }
     
     // Pass 2
@@ -223,9 +223,9 @@ int main(int argv, char **argc)
     int EXECADDR = PROGADDR;
     int start_addr = 0;
 
-    list<string> t_rec, t_location_list;
+    list<string> t_rec;
 
-    string object_code, saved_header, saved_t_location;
+    string object_code, saved_header;
     infile.open(argc[1]);
     while (!infile.eof())
     {
@@ -240,7 +240,6 @@ int main(int argv, char **argc)
             if (record[0] == 'T')
             {
                 parse_t_record(object_code, t_rec, start_addr);
-                t_location_list.push_back(object_code.substr(1, 6));
                 // this is where you link!!
                 string temp;
                 for (auto i : t_rec)
@@ -263,21 +262,13 @@ int main(int argv, char **argc)
                 parse_m_record(object_code, symbol, location, length, sign);
                 if (ESTAB.find(symbol) != ESTAB.end())
                 {
-                    string first = t_location_list.front();
-                    string second = t_location_list.back();
-
-                    /*
-                    stringstream ss;
-                    ss << hex << (int)char_from_mem;
-                    string test(ss.str());
-                    */
 
                     int int_location = stoi(location, nullptr, 16);
                     int int_length = stoi(length, nullptr, 16);
                     int actual_location = (int_location + ESTAB[saved_header].address) - 0x4000;
 
-                    // should apply to first m_records
-                    if(int_location < 0x40)
+                    // should apply to m records that use extended format
+                    if(int_length == 5)
                     {
                         string t;
                         for (int i = actual_location; i < actual_location + 3; i++)
@@ -291,6 +282,10 @@ int main(int argv, char **argc)
                             }
                             t += s;
                         }
+
+                        if(t.size() > 6)
+                            t = t.substr(0, 6);
+
                         int modified;
                         if (sign[0] == '+')
                             modified = stoi(t, nullptr, 16) + ESTAB[symbol].address;
@@ -339,7 +334,6 @@ int main(int argv, char **argc)
                                 inverse = ~inverse;
                             }
                             modified = inverse + ESTAB[symbol].address;
-                            //cout << "record: " << record << "\t\tt: " << t << "\tinverse: " << inverse << "\tmodified: " << modified << endl;
                         }
                         else
                         {
@@ -350,7 +344,6 @@ int main(int argv, char **argc)
                                 inverse = ~inverse;
                             }
                             modified = inverse - ESTAB[symbol].address;
-                            //cout << "record: " << record << "\t\tt: " << t << "\tinverse: " << inverse << "\tmodified: " << modified << endl;
                         }
                         stringstream ss;
                         ss << hex << modified;
@@ -377,8 +370,6 @@ int main(int argv, char **argc)
             }
             t_rec.clear();
         }
-        if(record[0] == 'E')
-            t_location_list.clear();
     }
     print_mem(mem);
 }
