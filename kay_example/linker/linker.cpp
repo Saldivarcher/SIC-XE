@@ -80,7 +80,7 @@ void parse_m_record(string record, string &sym, string &location, string &length
 void print_mem(char mem[])
 {
     cout << endl;
-    for (int i = 0; i < 0x150; i++)
+    for (int i = 0; i < 0x1500 ; i++)
     {
         if(i == 0)
             cout << i + 0x4000 << " ";
