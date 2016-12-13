@@ -239,7 +239,6 @@ void memory_object(string &t, int actual_location, char mem[])
     }
 }
 
-
 int main(int argv, char **argc)
 {
     map<string, estab_data> ESTAB;
@@ -301,7 +300,8 @@ int main(int argv, char **argc)
     {
         read_line(infile, header, record, cs, CSLTH);
         object_code = record;
-        if (header != ""){
+        if (header != "")
+        {
             CSLTH = ESTAB[header].length;
             saved_header = header;
         }
